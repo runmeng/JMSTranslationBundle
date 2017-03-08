@@ -168,8 +168,46 @@ class Updater
             }
 
             $outputFile = $this->config->getTranslationsDir().'/'.$name.'.'.$this->config->getLocale().'.'.$format;
+
+
+        // This will first detects if there already has a translation file.
+        // If yes, then check if there are changes in the file.
+        // If there are no changes, will not make any change in the file.
+        // If there are changes, will update the file with new timestamp.    
+        $files = glob($config->getTranslationsDir() . "/*." . $format);
+        $reRwite = true;
+
+        if ($files[0]==$outputFile) {
+            $dom = new \DOMDocument('1.0', 'utf-8');
+            $dom->load($files[0]);
+            $xml = simplexml_import_dom($dom);
+            $json = json_encode($xml);
+            $content = json_decode($json,TRUE);
+  
+            foreach ($content['file']['body']['trans-unit'] as $key) {
+                $trans_content[] = array($key['source'],$key['target']);
+            }
+        }
+
+        foreach ($this->scannedCatalogue->getDomains() as $domainCatalogue) {
+            foreach ($domainCatalogue->all() as $message) {
+                if (!$this->existingCatalogue->has($message)) {
+                    continue;
+                }
+
+                $existingMessage = clone $this->existingCatalogue->get($message->getId(), $message->getDomain());
+                $file_content[]=array($existingMessage->getId(),$existingMessage->getlocaleString());
+            }
+        }
+        
+            if ($trans_content == $file_content) {
+               $reRwite = false;
+            }
+        
             $this->logger->info(sprintf('Writing translation file "%s".', $outputFile));
-            $this->writer->write($this->scannedCatalogue, $name, $outputFile, $format);
+            if($reRwite){
+                $this->writer->write($this->scannedCatalogue, $name, $outputFile, $format);
+            }
         }
     }
 
